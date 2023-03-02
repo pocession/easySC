@@ -9,10 +9,11 @@ def get_input():
     Read data and check input
     https://docs.python.org/3/library/argparse.html
     '''
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Generate a basic profiles of your single cell RNA-seq data.')
     parser.add_argument('--data','-d', 
                         required=True,
-                        type=Path)
+                        type=Path,
+                        help='specify the input path') 
     p = parser.parse_args()
 
     p.data = p.data.resolve() # full file path

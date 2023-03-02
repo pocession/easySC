@@ -22,7 +22,7 @@ def get_input():
     else:
         print(f"Does not exist: {p.data}")
     
-    files = ["barcodes.tsv", "features.tsv", "matrix.mtx"]
+    files = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
     paths = list()
     for f in files:
         f = p.data / f

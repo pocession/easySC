@@ -1,73 +1,69 @@
 ## library
-import sys
-import os.path
+
+import argparse
+from pathlib import Path
 
 ## functions
-
-def examine_argv():
-    ## examine the arguments
-    if len(sys.argv) < 3:
-        print("Please provide both input and output")
-    
-    # Iterate through each path and check if it exists
-    paths = sys.argv[1:]
-    for path in paths:
-        if os.path.exists(path):
-            print(f"The path '{path}' exists!")
-        else:
-            print(f"The path '{path}' does not exist.")
-
-    if len(paths) >=2:
-        inPath = paths[0]
-        outPath = paths[1]
-
-    # Check input files 
-    ## Check if there is any files in input folder
-    if os.listdir(inPath) == []:
-        print("No files found in the input directory.")
-    else:
-        print("Some files found in the input directory.")
-
-    barcodes = os.path.join(inPath,"barcodes.tsv")
-    features = os.path.join(inPath,"features.tsv")
-    matrix = os.path.join(inPath,"matrix.mtx")
-
-    if not os.path.isfile(barcodes):
-        print("Please provide the barcode file named barcodes.tsv!")
-    
-    if not os.path.isfile(features):
-        print("Please provide feature (gene) file named features.tsv")
-
-    if not os.path.isfile(matrix):
-        print("Please provide the count matrix named matrix.mtx")
-
 def get_input():
-    print("Get input")
+    '''
+    Read data and check input
+    https://docs.python.org/3/library/argparse.html
+    '''
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data','-d', 
+                        required=True,
+                        type=Path)
+    p = parser.parse_args()
+
+    p.data = p.data.resolve() # full file path
+    if p.data.is_dir():
+        print(f"Input data dir: {p.data}")
+    else:
+        print(f"Does not exist: {p.data}")
+    
+    files = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
+    paths = list()
+    for f in files:
+        f = p.data / f
+        if f.is_file():
+            paths.append(f)
+        else:
+            print(f"missing file: {f}")
+
+    return paths
+
+def load_data(paths):
+    '''
+    Load the 3 data files
+    Save to a data class object
+    '''
+    print(paths)
 
 def filter_data():
-    ## ToDo: perform basic filtering, umi/gene, gene/cell
-    print("Filter data")
+    '''ToDo: perform basic filtering, umi/gene, gene/cell'''
+    pass
 
 def make_analysis():
-    ## generate analysis and plot
-    print("make analysis")
+    '''generate analysis and plot'''
+    pass
 
 def save_csv():
-    ## ToDo: write results into csv
-    print("Save CSV")
+    '''ToDo: write results into csv'''
+    pass
 
 def save_plot():
-    ## save plots
-    with open(outFile,'w') as o:
-        for line in processedLines:
-            o.write(line)
+    '''save plots'''
+    pass
 
 
 ## main
-examine_argv()
-""" input = get_input()
-filtered = filter_data(input)
-make_analysis(filtered)
+if __name__ == "__main__":
 
-save_csv()
-save_plot() """
+    paths = get_input()
+
+    load_data(paths)
+    filter_data()
+    make_analysis()
+
+    save_csv()
+    save_plot()

@@ -11,6 +11,13 @@ sc.settings.verbosity = 3             # verbosity: errors (0), warnings (1), inf
 sc.logging.print_header()
 print("..Loading packages complete!")
 
+## variables
+# This variables should be taken from input also
+min_genes = 200
+min_cells = 3
+up_cutoff = 0.75
+down_cutoff = 0.25
+
 ## functions
 def get_input():
     '''
@@ -65,31 +72,65 @@ def load_data(paths):
     return adata
 
 def filter_data(adata):
-    '''ToDo: perform basic filtering, umi/gene, gene/cell'''
-    
-    # basic filtering
-    ## We should make the app can take the criteria from input
-    sc.pp.filter_cells(adata, min_genes=200)
-    sc.pp.filter_genes(adata, min_cells=3)
-    print(f"After filtering, your data set contains {adata.n_obs} cells and {adata.n_vars} genes.")
-    return adata
+    '''
 
-def qc_data(adata_filtered):
-    ''' 
-    Draw figures for raw data and save them.
-    They are useful for QC.
-    The draw function comes from scanpy itself.
-    The out plots will be save in "./figures" automatically.
+    ToDo: perform filtering and produce QC plots
 
     '''
-    adata = adata_filtered
+    
+    # Preliminary filtering
+    sc.pp.filter_cells(adata, min_genes=min_genes)
+    sc.pp.filter_genes(adata, min_cells=min_cells)
+    print(f"Perform the preliminary filtering process. Cells with less than {min_genes} expressed genes and genes not expressed in more than {min_cells} are excluded.")
+    print(f"After the preliminary filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes.")
+
+   # Draw figures for raw data and save them.
+   # The draw function comes from scanpy itself.
+   # # The out plots will be save in "./figures" automatically.
+
 
     adata.var['mt'] = adata.var_names.str.startswith('MT-')  # annotate the group of mitochondrial genes as 'mt'
     sc.pp.calculate_qc_metrics(adata, qc_vars=['mt'], percent_top=None, log1p=False, inplace=True)
+
+    ## This should be wrapped up into a plot function
     sc.pl.violin(adata, ['n_genes_by_counts', 'total_counts', 'pct_counts_mt'],
-                    jitter=0.4, multi_panel=True, show=False, save="_basicQC.pdf")
-    sc.pl.scatter(adata, x='total_counts', y='pct_counts_mt',show=False, save="_mtQC.png")
-    sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts',show=False, save="_geneQC.png")
+                    jitter=0.4, multi_panel=True, show=False, save="_preliminaryQC.pdf")
+    sc.pl.scatter(adata, x='total_counts', y='pct_counts_mt',show=False, save="_preliminaryQC_mt.png")
+    sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts',show=False, save="_preliminaryQC_gene.png")
+    
+    # Determine the cutoff limits
+    df_obs= pd.DataFrame(adata.obs)
+    pct_counts_mt_up_cutoff=df_obs["pct_counts_mt"].quantile(up_cutoff)
+    total_counts_up_cutoff=df_obs["total_counts"].quantile(up_cutoff)
+    n_genes_by_count_up_cutoff=df_obs["n_genes_by_counts"].quantile(up_cutoff)
+
+    pct_counts_mt_down_cutoff=df_obs["pct_counts_mt"].quantile(down_cutoff)
+    total_counts_down_cutoff=df_obs["total_counts"].quantile(down_cutoff)
+    n_genes_by_count_down_cutoff=df_obs["n_genes_by_counts"].quantile(down_cutoff)
+
+    # Further filtering process
+    adata = adata[adata.obs.total_counts < total_counts_up_cutoff, :]
+    adata = adata[adata.obs.n_genes_by_counts < n_genes_by_count_up_cutoff, :]
+    adata = adata[adata.obs.pct_counts_mt < pct_counts_mt_up_cutoff, :]
+
+    adata = adata[adata.obs.total_counts > total_counts_down_cutoff, :]
+    adata = adata[adata.obs.n_genes_by_counts > n_genes_by_count_down_cutoff, :]
+    adata = adata[adata.obs.pct_counts_mt > pct_counts_mt_down_cutoff, :]
+
+    ## This should be wrapped up into a plot function
+    sc.pl.violin(adata, ['n_genes_by_counts', 'total_counts', 'pct_counts_mt'],
+                    jitter=0.4, multi_panel=True, show=False, save="_furtherQC.pdf")
+    sc.pl.scatter(adata, x='total_counts', y='pct_counts_mt',show=False, save="_furtherQC_mt.png")
+    sc.pl.scatter(adata, x='total_counts', y='n_genes_by_counts',show=False, save="_furtherQC_gene.png")
+    
+    print(f"Perform the further filtering process. The criteria:")
+    print(f"% mitochondria: {pct_counts_mt_down_cutoff} - {pct_counts_mt_up_cutoff} %.")
+    print(f"Total counts:  {total_counts_down_cutoff} - {total_counts_up_cutoff}.") 
+    print(f"Number of genes: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} genes.")
+    print(f"Cells beyond those criteria are excluded.")
+    print(f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes.")
+
+    return adata
 
 def make_analysis(adata):
     '''generate analysis and plot'''
@@ -105,7 +146,6 @@ if __name__ == "__main__":
     paths = get_input()
     adata = load_data(paths)
     adata_filtered = filter_data(adata)
-    qc_data(adata_filtered)
-    make_analysis(adata)
+    make_analysis(adata_filtered)
 
     save_csv()

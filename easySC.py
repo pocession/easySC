@@ -30,6 +30,35 @@ def get_input():
     parser.add_argument(
         "--data", "-d", required=True, type=Path, help="specify the input path"
     )
+    parser.add_argument(
+        "--min_genes",
+        required=False,
+        type=int,
+        default=200,
+        help="specify the minimum genes per cell (default = 200)",
+    )
+    parser.add_argument(
+        "--min_cells",
+        required=False,
+        type=int,
+        default=3,
+        help="keep genes that are expressed in the minimum number of cells (default = 3)",
+    )
+    parser.add_argument(
+        "--up_cutoff",
+        required=False,
+        type=int,
+        default=0.75,
+        help="keep cells with counts under this percentile (default = 0.75)",
+    )
+    parser.add_argument(
+        "--min_cutoff",
+        required=False,
+        type=int,
+        default=0.25,
+        help="keep cells with counts above this percentile (default = 0.25)",
+    )
+
     p = parser.parse_args()
 
     # p.data = input folder

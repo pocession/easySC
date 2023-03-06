@@ -21,7 +21,7 @@ def get_input():
         description="Generate a basic profiles of your single cell RNA-seq data."
     )
     parser.add_argument(
-        "--data", "-d", required=True, type=Path, help="specify the input path"
+        "--data_dir", "-d", required=True, type=Path, help="specify the input path"
     )
     parser.add_argument(
         "--min_genes",
@@ -52,37 +52,26 @@ def get_input():
         help="keep cells with parameters above this percentile (default = 0.25)",
     )
 
-    p = parser.parse_args()
+    args = parser.parse_args()
 
-    # To access each argument, use p.arg. e.g. p.min_genes
-
-    # p.data = input folder
-    # p.data.resolve() = full path of input folder
-    p.data = p.data.resolve()
-    if p.data.is_dir():
-        print(f"Input data dir: {p.data}")
-    else:
-        print(f"Does not exist: {p.data}")
-
+    # Check required input data files
     files = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
-    args = list()
     for f in files:
-        f = p.data / f
+        f = args.data_dir / f
         if f.is_file():
             print(f"file found: {f}")
         else:
-            print(f"missing file: {f}")
-    for i in (p.data, p.min_genes, p.min_cells, p.max_cutoff, p.min_cutoff):
-        args.append(i)
+            print(f"File not found: {f}")
+
     return args
 
 
 class SCAnalysis:
-    def __init__(self, args):
+    def __init__(self, args=list()):
         self.args = args
+        self.data = None
 
-    @classmethod
-    def load_data(exp, args):
+    def load_data(self):
         """
         Load the 3 data files
         Save to a data class object
@@ -93,25 +82,25 @@ class SCAnalysis:
 
         # print(paths)
         print("..  reading input data..")
-        adata = sc.read_10x_mtx(
-            args[0],  # the directory with the `.mtx` file
+        self.data = sc.read_10x_mtx(
+            self.args.data_dir,  # the directory with the `.mtx` file
             var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
             cache=True,
         )
-        adata.var_names_make_unique()  # necessary because we use gene symbols as var_names
-        print(f"Your data set contains {adata.n_obs} cells and {adata.n_vars} genes.")
-        return adata
+        self.data.var_names_make_unique()  # necessary because we use gene symbols as var_names
+        print(f"Your data set contains {self.data.n_obs} cells and {self.data.n_vars} genes.")
 
-    def filter_data(exp, adata, args):
+    def filter_data(self):
         """
         ToDo: perform filtering and produce QC plots
         """
 
         # p.data,p.min_genes,p.min_cells,p.up_cutoff,p.min_cutoff
-        min_genes = args[1]
-        min_cells = args[2]
-        up_cutoff = args[3]
-        down_cutoff = args[4]
+        min_genes = self.args.min_genes
+        min_cells = self.args.min_cells
+        up_cutoff = self.args.max_cutoff
+        down_cutoff = self.args.min_cutoff
+        adata = self.data
 
         # Preliminary filtering process
         sc.pp.filter_cells(adata, min_genes=min_genes)
@@ -159,13 +148,16 @@ class SCAnalysis:
             f"\tCells should contain genes within the following range: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} (represents {down_cutoff} - {up_cutoff} percentile)."
         )
 
+        self.data = adata
+
+    def plot_filtered_data(self):
         # Draw figures for raw data and save them.
         # The draw function comes from scanpy itself.
         # # The out plots will be save in "./figures" automatically.
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
-            adata,
+            self.data,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
@@ -173,14 +165,14 @@ class SCAnalysis:
             save="_preliminaryQC.pdf",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="pct_counts_mt",
             show=False,
             save="_preliminaryQC_mt.png",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
@@ -189,7 +181,7 @@ class SCAnalysis:
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
-            adata,
+            self.data,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
@@ -197,14 +189,14 @@ class SCAnalysis:
             save="_furtherQC.pdf",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="pct_counts_mt",
             show=False,
             save="_furtherQC_mt.png",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
@@ -212,20 +204,20 @@ class SCAnalysis:
         )
 
         print(
-            f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
+            f"Finished filtering. Data size: \n",
+            "Cells: {self.data.n_obs} \n",
+            "Genes: {self.data.n_vars} "
         )
 
-        return adata
+
+    def make_analysis(self):
+        """generate analysis and plot"""
+        pass
 
 
-def make_analysis(adata):
-    """generate analysis and plot"""
-    pass
-
-
-def save_csv():
-    """ToDo: write results into csv"""
-    pass
+    def save_csv(self):
+        """ToDo: write results into csv"""
+        pass
 
 
 ## main
@@ -233,8 +225,8 @@ if __name__ == "__main__":
 
     args = get_input()
     exp = SCAnalysis(args)
-    adata = exp.load_data(args)
-    adata_filtered = exp.filter_data(adata, args)
-    make_analysis(adata_filtered)
-
-    save_csv()
+    exp.load_data()
+    exp.filter_data()
+    exp.plot_filtered_data()
+    exp.make_analysis()
+    exp.save_csv()

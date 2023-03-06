@@ -6,17 +6,10 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 
-print("..Loading packages..")
+print("..  loading packages ..")
 sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hints (3)
 sc.logging.print_header()
-print("..Loading packages complete!")
-
-## variables
-# This variables should be taken from input also
-min_genes = 200
-min_cells = 3
-up_cutoff = 0.75
-down_cutoff = 0.25
+print("...  loading packages complete!")
 
 ## functions
 def get_input():
@@ -45,7 +38,7 @@ def get_input():
         help="keep genes that are expressed in the minimum number of cells (default = 3)",
     )
     parser.add_argument(
-        "--up_cutoff",
+        "--max_cutoff",
         required=False,
         type=int,
         default=0.75,
@@ -61,6 +54,8 @@ def get_input():
 
     p = parser.parse_args()
 
+    # To access each argument, use p.arg. e.g. p.min_genes
+
     # p.data = input folder
     # p.data.resolve() = full path of input folder
     p.data = p.data.resolve()
@@ -70,24 +65,24 @@ def get_input():
         print(f"Does not exist: {p.data}")
 
     files = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
-    paths = list()
+    args = list()
     for f in files:
         f = p.data / f
         if f.is_file():
             print(f"file found: {f}")
         else:
             print(f"missing file: {f}")
-    paths.append(p.data)  # append the input folder path in the last position
-
-    return paths
+    for i in (p.data, p.min_genes, p.min_cells, p.max_cutoff, p.min_cutoff):
+        args.append(i)
+    return args
 
 
 class SCAnalysis:
-    def __init__(self, paths):
-        self.paths = paths
+    def __init__(self, args):
+        self.args = args
 
     @classmethod
-    def load_data(exp, paths):
+    def load_data(exp, args):
         """
         Load the 3 data files
         Save to a data class object
@@ -97,9 +92,9 @@ class SCAnalysis:
         """
 
         # print(paths)
-        print("..Reading input data..")
+        print("..  reading input data..")
         adata = sc.read_10x_mtx(
-            paths[0],  # the directory with the `.mtx` file
+            args[0],  # the directory with the `.mtx` file
             var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
             cache=True,
         )
@@ -107,31 +102,66 @@ class SCAnalysis:
         print(f"Your data set contains {adata.n_obs} cells and {adata.n_vars} genes.")
         return adata
 
-    def filter_data(exp, adata):
+    def filter_data(exp, adata, args):
         """
         ToDo: perform filtering and produce QC plots
         """
 
-        # Preliminary filtering
+        # p.data,p.min_genes,p.min_cells,p.up_cutoff,p.min_cutoff
+        min_genes = args[1]
+        min_cells = args[2]
+        up_cutoff = args[3]
+        down_cutoff = args[4]
+
+        # Preliminary filtering process
         sc.pp.filter_cells(adata, min_genes=min_genes)
         sc.pp.filter_genes(adata, min_cells=min_cells)
-        print(
-            f"Perform the preliminary filtering process. Cells with less than {min_genes} expressed genes and genes not expressed in more than {min_cells} are excluded."
-        )
-        print(
-            f"After the preliminary filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
-        )
 
-        # Draw figures for raw data and save them.
-        # The draw function comes from scanpy itself.
-        # # The out plots will be save in "./figures" automatically.
-
+        # Generate QC metrics
         adata.var["mt"] = adata.var_names.str.startswith(
             "MT-"
         )  # annotate the group of mitochondrial genes as 'mt'
         sc.pp.calculate_qc_metrics(
             adata, qc_vars=["mt"], percent_top=None, log1p=False, inplace=True
         )
+
+        # Transform the objects of adata into a data frame
+        df_obs = pd.DataFrame(adata.obs)
+
+        # Determine the cutoff limits
+        pct_counts_mt_up_cutoff = df_obs["pct_counts_mt"].quantile(up_cutoff)
+        total_counts_up_cutoff = df_obs["total_counts"].quantile(up_cutoff)
+        n_genes_by_count_up_cutoff = df_obs["n_genes_by_counts"].quantile(up_cutoff)
+
+        # It is not necessary to filter cells based on the minimal % mitochondrial RNA
+        # pct_counts_mt_down_cutoff = df_obs["pct_counts_mt"].quantile(down_cutoff)
+        total_counts_down_cutoff = df_obs["total_counts"].quantile(down_cutoff)
+        n_genes_by_count_down_cutoff = df_obs["n_genes_by_counts"].quantile(down_cutoff)
+
+        # Further filtering process
+        adata = adata[adata.obs.total_counts < total_counts_up_cutoff, :]
+        adata = adata[adata.obs.n_genes_by_counts < n_genes_by_count_up_cutoff, :]
+        adata = adata[adata.obs.pct_counts_mt < pct_counts_mt_up_cutoff, :]
+
+        adata = adata[adata.obs.total_counts > total_counts_down_cutoff, :]
+        adata = adata[adata.obs.n_genes_by_counts > n_genes_by_count_down_cutoff, :]
+        # adata = adata[adata.obs.pct_counts_mt > pct_counts_mt_down_cutoff, :]
+        print(f"The pipeline process data with the following criteria:")
+        print(f"\tCells should contain more than {min_genes} expressed genes.")
+        print(f"\tGenes should be expressed in more than {min_cells} cells.")
+        print(
+            f"\tCells should contain less than {pct_counts_mt_up_cutoff}% mitochondrial RNA (within {up_cutoff} percentile)."
+        )
+        print(
+            f"\tCells should contain total counts with the following range:  {total_counts_down_cutoff} - {total_counts_up_cutoff} ({down_cutoff} - {up_cutoff} percentile)."
+        )
+        print(
+            f"\tCells should contain genes within the following range: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} (represents {down_cutoff} - {up_cutoff} percentile)."
+        )
+
+        # Draw figures for raw data and save them.
+        # The draw function comes from scanpy itself.
+        # # The out plots will be save in "./figures" automatically.
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
@@ -157,25 +187,6 @@ class SCAnalysis:
             save="_preliminaryQC_gene.png",
         )
 
-        # Determine the cutoff limits
-        df_obs = pd.DataFrame(adata.obs)
-        pct_counts_mt_up_cutoff = df_obs["pct_counts_mt"].quantile(up_cutoff)
-        total_counts_up_cutoff = df_obs["total_counts"].quantile(up_cutoff)
-        n_genes_by_count_up_cutoff = df_obs["n_genes_by_counts"].quantile(up_cutoff)
-
-        pct_counts_mt_down_cutoff = df_obs["pct_counts_mt"].quantile(down_cutoff)
-        total_counts_down_cutoff = df_obs["total_counts"].quantile(down_cutoff)
-        n_genes_by_count_down_cutoff = df_obs["n_genes_by_counts"].quantile(down_cutoff)
-
-        # Further filtering process
-        adata = adata[adata.obs.total_counts < total_counts_up_cutoff, :]
-        adata = adata[adata.obs.n_genes_by_counts < n_genes_by_count_up_cutoff, :]
-        adata = adata[adata.obs.pct_counts_mt < pct_counts_mt_up_cutoff, :]
-
-        adata = adata[adata.obs.total_counts > total_counts_down_cutoff, :]
-        adata = adata[adata.obs.n_genes_by_counts > n_genes_by_count_down_cutoff, :]
-        adata = adata[adata.obs.pct_counts_mt > pct_counts_mt_down_cutoff, :]
-
         ## This should be wrapped up into a plot function
         sc.pl.violin(
             adata,
@@ -200,15 +211,6 @@ class SCAnalysis:
             save="_furtherQC_gene.png",
         )
 
-        print(f"Perform the further filtering process. The criteria:")
-        print(
-            f"% mitochondria: {pct_counts_mt_down_cutoff} - {pct_counts_mt_up_cutoff} %."
-        )
-        print(f"Total counts:  {total_counts_down_cutoff} - {total_counts_up_cutoff}.")
-        print(
-            f"Number of genes: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} genes."
-        )
-        print(f"Cells beyond those criteria are excluded.")
         print(
             f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
         )
@@ -229,10 +231,10 @@ def save_csv():
 ## main
 if __name__ == "__main__":
 
-    paths = get_input()
-    exp = SCAnalysis(paths)
-    adata = exp.load_data(paths)
-    adata_filtered = exp.filter_data(adata)
+    args = get_input()
+    exp = SCAnalysis(args)
+    adata = exp.load_data(args)
+    adata_filtered = exp.filter_data(adata, args)
     make_analysis(adata_filtered)
 
     save_csv()

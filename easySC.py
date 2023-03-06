@@ -42,14 +42,14 @@ def get_input():
         required=False,
         type=int,
         default=0.75,
-        help="keep cells with counts under this percentile (default = 0.75)",
+        help="keep cells with parameters under this percentile (default = 0.75)",
     )
     parser.add_argument(
         "--min_cutoff",
         required=False,
         type=int,
         default=0.25,
-        help="keep cells with counts above this percentile (default = 0.25)",
+        help="keep cells with parameters above this percentile (default = 0.25)",
     )
 
     p = parser.parse_args()

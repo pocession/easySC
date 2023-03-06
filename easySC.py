@@ -11,7 +11,8 @@ sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hint
 sc.logging.print_header()
 print("...  loading packages complete!")
 
-## functions
+## Functions
+### Get input data
 def get_input():
     """
     Read data and check input
@@ -75,6 +76,17 @@ def get_input():
     for i in (p.data, p.min_genes, p.min_cells, p.max_cutoff, p.min_cutoff):
         args.append(i)
     return args
+
+### Save to csv files
+def save_csv(df,str):
+    """ToDo: write results into csv"""
+    compression = 'zip'
+    filename = (str,'csv',compression)
+    filename = ".".join(filename)
+    filepath = Path('./results/',filename)
+    compression_opts = dict(method='zip')
+    filepath.parent.mkdir(parents=True, exist_ok=True) 
+    df.to_csv(filepath,sep=",",compression = compression_opts)
 
 
 class SCAnalysis:
@@ -159,6 +171,10 @@ class SCAnalysis:
             f"\tCells should contain genes within the following range: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} (represents {down_cutoff} - {up_cutoff} percentile)."
         )
 
+        print(
+            f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
+        )
+
         # Draw figures for raw data and save them.
         # The draw function comes from scanpy itself.
         # # The out plots will be save in "./figures" automatically.
@@ -177,14 +193,14 @@ class SCAnalysis:
             x="total_counts",
             y="pct_counts_mt",
             show=False,
-            save="_preliminaryQC_mt.png",
+            save="_preliminaryQC_mt.pdf",
         )
         sc.pl.scatter(
             adata,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
-            save="_preliminaryQC_gene.png",
+            save="_preliminaryQC_gene.pdf",
         )
 
         ## This should be wrapped up into a plot function
@@ -201,18 +217,14 @@ class SCAnalysis:
             x="total_counts",
             y="pct_counts_mt",
             show=False,
-            save="_furtherQC_mt.png",
+            save="_furtherQC_mt.pdf",
         )
         sc.pl.scatter(
             adata,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
-            save="_furtherQC_gene.png",
-        )
-
-        print(
-            f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
+            save="_furtherQC_gene.pdf",
         )
 
         return adata
@@ -220,13 +232,37 @@ class SCAnalysis:
 
 def make_analysis(adata):
     """generate analysis and plot"""
-    pass
+
+    # Total-count normalize
+    sc.pp.normalize_total(adata, target_sum=1e4)
+
+    # Logarithmize the data:
+    sc.pp.log1p(adata)
+
+    # Identify highly-variable genes.
+    sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+
+    # freeze the data into raw attribute
+    adata.raw = adata
+
+    ## Save the high variant gene plot
+    sc.pl.highly_variable_genes(adata,show=False,save="_highlyVariableGenes.pdf")
+
+    ## Filter the data based on highly variable genes
+    adata_hvg = adata[:,adata.var.highly_variable]
+
+    ## Not sure what the below two steps are doing
+    ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
+    sc.pp.regress_out(adata, ['total_counts', 'pct_counts_mt'])
+    ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
+    sc.pp.scale(adata, max_value=10)
+
+    df_hvg = pd.DataFrame.sparse.from_spmatrix(adata_hvg.X,index=adata_hvg.obs_names,columns=adata_hvg.var_names)
+    save_csv(df_hvg,"hvg")
 
 
-def save_csv():
-    """ToDo: write results into csv"""
-    pass
-
+    #umap
+    sc.tl.umap(adata)
 
 ## main
 if __name__ == "__main__":
@@ -236,5 +272,3 @@ if __name__ == "__main__":
     adata = exp.load_data(args)
     adata_filtered = exp.filter_data(adata, args)
     make_analysis(adata_filtered)
-
-    save_csv()

@@ -79,11 +79,11 @@ def save_csv(df,str):
 
 
 class SCAnalysis:
-    def __init__(self, args):
+    def __init__(self, args=list()):
         self.args = args
+        self.adata = None
 
-    @classmethod
-    def load_data(exp, args):
+    def load_data(self):
         """
         Load the 3 data files
         Save to a data class object
@@ -94,16 +94,15 @@ class SCAnalysis:
 
         # print(paths)
         print("..  reading input data..")
-        adata = sc.read_10x_mtx(
+        self.adata = sc.read_10x_mtx(
             args.data_dir,  # the directory with the `.mtx` file
             var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
             cache=True,
         )
-        adata.var_names_make_unique()  # necessary because we use gene symbols as var_names
-        print(f"Your data set contains {adata.n_obs} cells and {adata.n_vars} genes.")
-        return adata
+        self.adata.var_names_make_unique()  # necessary because we use gene symbols as var_names
+        print(f"Your data set contains {self.adata.n_obs} cells and {self.adata.n_vars} genes.")
 
-    def filter_data(exp, adata, args):
+    def filter_data(self):
         """
         ToDo: perform filtering and produce QC plots
         """
@@ -113,6 +112,7 @@ class SCAnalysis:
         min_cells = args.min_cells
         up_cutoff = args.max_cutoff
         down_cutoff = args.min_cutoff
+        adata = self.adata
 
         # Preliminary filtering process
         sc.pp.filter_cells(adata, min_genes=min_genes)
@@ -164,9 +164,14 @@ class SCAnalysis:
             f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
         )
 
+        self.adata = adata
+
+    def plot_filtered_data(self):
         # Draw figures for raw data and save them.
         # The draw function comes from scanpy itself.
         # # The out plots will be save in "./figures" automatically.
+
+        adata = self.adata
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
@@ -216,52 +221,53 @@ class SCAnalysis:
             save="_furtherQC_gene.pdf",
         )
 
-        return adata
+
+    def make_analysis(self):
+        """generate analysis and plot"""
+
+        adata = self.adata
+
+        # Total-count normalize
+        sc.pp.normalize_total(adata, target_sum=1e4)
+
+        # Logarithmize the data:
+        sc.pp.log1p(adata)
+
+        # Identify highly-variable genes.
+        sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+
+        # freeze the data into raw attribute
+        adata.raw = adata
+
+        ## Save the high variant gene plot
+        sc.pl.highly_variable_genes(adata,show=False,save="_highlyVariableGenes.pdf")
+
+        ## Filter the data based on highly variable genes
+        adata_hvg = self.adata[:,adata.var.highly_variable]
+
+        ## Not sure what the below two steps are doing
+        ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
+        ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
+
+        # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
+        # sc.pp.scale(adata_hvg, max_value=10)
+
+        df_hvg = pd.DataFrame.sparse.from_spmatrix(adata_hvg.X,index=adata_hvg.obs_names,columns=adata_hvg.var_names)
+        save_csv(df_hvg,"hvg")
 
 
-def make_analysis(adata):
-    """generate analysis and plot"""
-
-    # Total-count normalize
-    sc.pp.normalize_total(adata, target_sum=1e4)
-
-    # Logarithmize the data:
-    sc.pp.log1p(adata)
-
-    # Identify highly-variable genes.
-    sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
-
-    # freeze the data into raw attribute
-    adata.raw = adata
-
-    ## Save the high variant gene plot
-    sc.pl.highly_variable_genes(adata,show=False,save="_highlyVariableGenes.pdf")
-
-    ## Filter the data based on highly variable genes
-    adata_hvg = adata[:,adata.var.highly_variable]
-
-    ## Not sure what the below two steps are doing
-    ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
-    ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
-
-    # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
-    # sc.pp.scale(adata_hvg, max_value=10)
-
-    df_hvg = pd.DataFrame.sparse.from_spmatrix(adata_hvg.X,index=adata_hvg.obs_names,columns=adata_hvg.var_names)
-    save_csv(df_hvg,"hvg")
-
-
-    #umap
-    sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
-    sc.tl.umap(adata_hvg)
-    sc.tl.leiden(adata_hvg)
-    sc.pl.umap(adata_hvg,color=['leiden'],use_raw=False,show=False,save="_leiden_pdf")
+        #umap
+        sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
+        sc.tl.umap(adata_hvg)
+        sc.tl.leiden(adata_hvg)
+        sc.pl.umap(adata_hvg,color=['leiden'],use_raw=False,show=False,save="_leiden_pdf")
 
 ## main
 if __name__ == "__main__":
 
     args = get_input()
     exp = SCAnalysis(args)
-    adata = exp.load_data(args)
-    adata_filtered = exp.filter_data(adata, args)
-    make_analysis(adata_filtered)
+    exp.load_data()
+    exp.filter_data()
+    exp.plot_filtered_data()
+    exp.make_analysis()

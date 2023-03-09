@@ -64,6 +64,7 @@ def get_input():
         else:
             print(f"missing file: {f}")
 
+
     return args
 
 ### Save to csv files
@@ -175,7 +176,7 @@ class SCAnalysis:
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
-            adata,
+            self.data,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
@@ -183,14 +184,14 @@ class SCAnalysis:
             save="_preliminaryQC.pdf",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="pct_counts_mt",
             show=False,
             save="_preliminaryQC_mt.pdf",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
@@ -199,7 +200,7 @@ class SCAnalysis:
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
-            adata,
+            self.data,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
@@ -207,14 +208,14 @@ class SCAnalysis:
             save="_furtherQC.pdf",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="pct_counts_mt",
             show=False,
             save="_furtherQC_mt.pdf",
         )
         sc.pl.scatter(
-            adata,
+            self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,

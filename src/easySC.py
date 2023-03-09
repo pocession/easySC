@@ -13,6 +13,7 @@ print("...  loading packages complete!")
 
 ## Functions
 ### Get input data
+
 def get_input():
     """
     Read data and check input
@@ -62,6 +63,7 @@ def get_input():
         if f.is_file():
             print(f"file found: {f}")
         else:
+
             print(f"missing file: {f}")
 
 
@@ -82,6 +84,7 @@ def save_csv(df,str):
 class SCAnalysis:
     def __init__(self, args=list()):
         self.args = args
+
         self.adata = None
 
     def load_data(self):
@@ -95,6 +98,7 @@ class SCAnalysis:
 
         # print(paths)
         print("..  reading input data..")
+
         self.adata = sc.read_10x_mtx(
             args.data_dir,  # the directory with the `.mtx` file
             var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
@@ -103,12 +107,14 @@ class SCAnalysis:
         self.adata.var_names_make_unique()  # necessary because we use gene symbols as var_names
         print(f"Your data set contains {self.adata.n_obs} cells and {self.adata.n_vars} genes.")
 
+
     def filter_data(self):
         """
         ToDo: perform filtering and produce QC plots
         """
 
         # p.data,p.min_genes,p.min_cells,p.up_cutoff,p.min_cutoff
+
         min_genes = args.min_genes
         min_cells = args.min_cells
         up_cutoff = args.max_cutoff
@@ -161,6 +167,7 @@ class SCAnalysis:
             f"\tCells should contain genes within the following range: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} (represents {down_cutoff} - {up_cutoff} percentile)."
         )
 
+
         print(
             f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
         )
@@ -171,6 +178,7 @@ class SCAnalysis:
         # Draw figures for raw data and save them.
         # The draw function comes from scanpy itself.
         # # The out plots will be save in "./figures" automatically.
+
 
         adata = self.adata
 
@@ -188,14 +196,18 @@ class SCAnalysis:
             x="total_counts",
             y="pct_counts_mt",
             show=False,
+
             save="_preliminaryQC_mt.pdf",
+
         )
         sc.pl.scatter(
             self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
+
             save="_preliminaryQC_gene.pdf",
+
         )
 
         ## This should be wrapped up into a plot function
@@ -212,13 +224,16 @@ class SCAnalysis:
             x="total_counts",
             y="pct_counts_mt",
             show=False,
+
             save="_furtherQC_mt.pdf",
+
         )
         sc.pl.scatter(
             self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
+
             save="_furtherQC_gene.pdf",
         )
 
@@ -262,6 +277,7 @@ class SCAnalysis:
         sc.tl.umap(adata_hvg)
         sc.tl.leiden(adata_hvg)
         sc.pl.umap(adata_hvg,color=['leiden'],use_raw=False,show=False,save="_leiden_pdf")
+
 
 ## main
 if __name__ == "__main__":

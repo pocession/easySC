@@ -6,7 +6,7 @@ This app aims for producing preliminary profiles of single cell data. It only su
 
 ## Usage
 
-- `usage: easySC.py [-h] --data_dir DATA [--min_genes MIN_GENES] [--min_cells MIN_CELLS] [--max_cutoff MAX_CUTOFF] [--min_cutoff MIN_CUTOFF]`
+- `usage: python3 src/easySC.py [-h] --data DATA [--min_genes MIN_GENES] [--min_cells MIN_CELLS] [--max_cutoff MAX_CUTOFF] [--min_cutoff MIN_CUTOFF]`
 - `--data` `-d`: a folder contains three files: `barcodes.tsv.gz`, `features.tsv.gz`, and `matrix.mtx.gz`.
 - `--min_genes`: specify the minimum genes per cell (default = 200).
 - `--min_cells`: keep genes that are expressed in the minimum number of cells (default = 3).
@@ -22,6 +22,11 @@ This app aims for producing preliminary profiles of single cell data. It only su
 ## Test data
 
 - `wget https://cf.10xgenomics.com/samples/cell-exp/4.0.0/SC3_v3_NextGem_SI_PBMC_10K/SC3_v3_NextGem_SI_PBMC_10K_raw_feature_bc_matrix.tar.gz`
+
+## Unit tests
+
+Use pytest for test.
+`python3 -m pytest`
 
 ## Workflow
 

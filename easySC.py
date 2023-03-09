@@ -22,7 +22,7 @@ def get_input():
         description="Generate a basic profiles of your single cell RNA-seq data."
     )
     parser.add_argument(
-        "--data", "-d", required=True, type=Path, help="specify the input path"
+        "--data_dir", "-d", required=True, type=Path, help="specify the input path"
     )
     parser.add_argument(
         "--min_genes",
@@ -53,28 +53,17 @@ def get_input():
         help="keep cells with parameters above this percentile (default = 0.25)",
     )
 
-    p = parser.parse_args()
+    args = parser.parse_args()
 
-    # To access each argument, use p.arg. e.g. p.min_genes
-
-    # p.data = input folder
-    # p.data.resolve() = full path of input folder
-    p.data = p.data.resolve()
-    if p.data.is_dir():
-        print(f"Input data dir: {p.data}")
-    else:
-        print(f"Does not exist: {p.data}")
-
+    # Check required input data files
     files = ["barcodes.tsv.gz", "features.tsv.gz", "matrix.mtx.gz"]
-    args = list()
     for f in files:
-        f = p.data / f
+        f = args.data_dir / f
         if f.is_file():
             print(f"file found: {f}")
         else:
             print(f"missing file: {f}")
-    for i in (p.data, p.min_genes, p.min_cells, p.max_cutoff, p.min_cutoff):
-        args.append(i)
+
     return args
 
 ### Save to csv files
@@ -106,7 +95,7 @@ class SCAnalysis:
         # print(paths)
         print("..  reading input data..")
         adata = sc.read_10x_mtx(
-            args[0],  # the directory with the `.mtx` file
+            args.data_dir,  # the directory with the `.mtx` file
             var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
             cache=True,
         )
@@ -120,10 +109,10 @@ class SCAnalysis:
         """
 
         # p.data,p.min_genes,p.min_cells,p.up_cutoff,p.min_cutoff
-        min_genes = args[1]
-        min_cells = args[2]
-        up_cutoff = args[3]
-        down_cutoff = args[4]
+        min_genes = args.min_genes
+        min_cells = args.min_cells
+        up_cutoff = args.max_cutoff
+        down_cutoff = args.min_cutoff
 
         # Preliminary filtering process
         sc.pp.filter_cells(adata, min_genes=min_genes)
@@ -253,16 +242,20 @@ def make_analysis(adata):
 
     ## Not sure what the below two steps are doing
     ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
-    sc.pp.regress_out(adata, ['total_counts', 'pct_counts_mt'])
     ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
-    sc.pp.scale(adata, max_value=10)
+
+    # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
+    # sc.pp.scale(adata_hvg, max_value=10)
 
     df_hvg = pd.DataFrame.sparse.from_spmatrix(adata_hvg.X,index=adata_hvg.obs_names,columns=adata_hvg.var_names)
     save_csv(df_hvg,"hvg")
 
 
     #umap
-    sc.tl.umap(adata)
+    sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
+    sc.tl.umap(adata_hvg)
+    sc.tl.leiden(adata_hvg)
+    sc.pl.umap(adata_hvg,color=['leiden'],use_raw=False,show=False,save="_leiden_pdf")
 
 ## main
 if __name__ == "__main__":

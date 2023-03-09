@@ -11,6 +11,6 @@ def test_unittest():
 
     args = list()
     exp = SCAnalysis(args)
-    
+
     assert hasattr(exp, 'args')
     assert hasattr(exp, 'data')

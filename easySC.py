@@ -11,7 +11,8 @@ sc.settings.verbosity = 3  # verbosity: errors (0), warnings (1), info (2), hint
 sc.logging.print_header()
 print("...  loading packages complete!")
 
-## functions
+## Functions
+### Get input data
 def get_input():
     """
     Read data and check input
@@ -61,15 +62,27 @@ def get_input():
         if f.is_file():
             print(f"file found: {f}")
         else:
-            print(f"File not found: {f}")
+            print(f"missing file: {f}")
+
 
     return args
+
+### Save to csv files
+def save_csv(df,str):
+    """ToDo: write results into csv"""
+    compression = 'zip'
+    filename = (str,'csv',compression)
+    filename = ".".join(filename)
+    filepath = Path('./results/',filename)
+    compression_opts = dict(method='zip')
+    filepath.parent.mkdir(parents=True, exist_ok=True) 
+    df.to_csv(filepath,sep=",",compression = compression_opts)
 
 
 class SCAnalysis:
     def __init__(self, args=list()):
         self.args = args
-        self.data = None
+        self.adata = None
 
     def load_data(self):
         """
@@ -82,13 +95,13 @@ class SCAnalysis:
 
         # print(paths)
         print("..  reading input data..")
-        self.data = sc.read_10x_mtx(
-            self.args.data_dir,  # the directory with the `.mtx` file
+        self.adata = sc.read_10x_mtx(
+            args.data_dir,  # the directory with the `.mtx` file
             var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
             cache=True,
         )
-        self.data.var_names_make_unique()  # necessary because we use gene symbols as var_names
-        print(f"Your data set contains {self.data.n_obs} cells and {self.data.n_vars} genes.")
+        self.adata.var_names_make_unique()  # necessary because we use gene symbols as var_names
+        print(f"Your data set contains {self.adata.n_obs} cells and {self.adata.n_vars} genes.")
 
     def filter_data(self):
         """
@@ -96,11 +109,11 @@ class SCAnalysis:
         """
 
         # p.data,p.min_genes,p.min_cells,p.up_cutoff,p.min_cutoff
-        min_genes = self.args.min_genes
-        min_cells = self.args.min_cells
-        up_cutoff = self.args.max_cutoff
-        down_cutoff = self.args.min_cutoff
-        adata = self.data
+        min_genes = args.min_genes
+        min_cells = args.min_cells
+        up_cutoff = args.max_cutoff
+        down_cutoff = args.min_cutoff
+        adata = self.adata
 
         # Preliminary filtering process
         sc.pp.filter_cells(adata, min_genes=min_genes)
@@ -148,12 +161,18 @@ class SCAnalysis:
             f"\tCells should contain genes within the following range: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} (represents {down_cutoff} - {up_cutoff} percentile)."
         )
 
-        self.data = adata
+        print(
+            f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
+        )
+
+        self.adata = adata
 
     def plot_filtered_data(self):
         # Draw figures for raw data and save them.
         # The draw function comes from scanpy itself.
         # # The out plots will be save in "./figures" automatically.
+
+        adata = self.adata
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
@@ -169,14 +188,14 @@ class SCAnalysis:
             x="total_counts",
             y="pct_counts_mt",
             show=False,
-            save="_preliminaryQC_mt.png",
+            save="_preliminaryQC_mt.pdf",
         )
         sc.pl.scatter(
             self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
-            save="_preliminaryQC_gene.png",
+            save="_preliminaryQC_gene.pdf",
         )
 
         ## This should be wrapped up into a plot function
@@ -193,32 +212,56 @@ class SCAnalysis:
             x="total_counts",
             y="pct_counts_mt",
             show=False,
-            save="_furtherQC_mt.png",
+            save="_furtherQC_mt.pdf",
         )
         sc.pl.scatter(
             self.data,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
-            save="_furtherQC_gene.png",
-        )
-
-        print(
-            f"Finished filtering. Data size: \n",
-            "Cells: {self.data.n_obs} \n",
-            "Genes: {self.data.n_vars} "
+            save="_furtherQC_gene.pdf",
         )
 
 
     def make_analysis(self):
         """generate analysis and plot"""
-        pass
+
+        adata = self.adata
+
+        # Total-count normalize
+        sc.pp.normalize_total(adata, target_sum=1e4)
+
+        # Logarithmize the data:
+        sc.pp.log1p(adata)
+
+        # Identify highly-variable genes.
+        sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+
+        # freeze the data into raw attribute
+        adata.raw = adata
+
+        ## Save the high variant gene plot
+        sc.pl.highly_variable_genes(adata,show=False,save="_highlyVariableGenes.pdf")
+
+        ## Filter the data based on highly variable genes
+        adata_hvg = self.adata[:,adata.var.highly_variable]
+
+        ## Not sure what the below two steps are doing
+        ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
+        ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
+
+        # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
+        # sc.pp.scale(adata_hvg, max_value=10)
+
+        df_hvg = pd.DataFrame.sparse.from_spmatrix(adata_hvg.X,index=adata_hvg.obs_names,columns=adata_hvg.var_names)
+        save_csv(df_hvg,"hvg")
 
 
-    def save_csv(self):
-        """ToDo: write results into csv"""
-        pass
-
+        #umap
+        sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
+        sc.tl.umap(adata_hvg)
+        sc.tl.leiden(adata_hvg)
+        sc.pl.umap(adata_hvg,color=['leiden'],use_raw=False,show=False,save="_leiden_pdf")
 
 ## main
 if __name__ == "__main__":
@@ -229,4 +272,3 @@ if __name__ == "__main__":
     exp.filter_data()
     exp.plot_filtered_data()
     exp.make_analysis()
-    exp.save_csv()

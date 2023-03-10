@@ -11,7 +11,8 @@ This app aims for producing preliminary profiles of single cell data. It only su
 - `--min_genes`: specify the minimum genes per cell (default = 200).
 - `--min_cells`: keep genes that are expressed in the minimum number of cells (default = 3).
 - `--max_cutoff`: keep cells with parameters under this percentile (default = 0.75).
-- `--min_cutoff`: keep cells with parameters above this percentile (default = 0.25)
+- `--min_cutoff`: keep cells with parameters above this percentile (default = 0.25).
+- `--fig_format`: set the file format of output figures (default = .png).
 
 ## Updates
 

@@ -14,6 +14,7 @@ print("...  loading packages complete!")
 ## Functions
 ### Get input data
 
+
 def get_input():
     """
     Read data and check input
@@ -53,6 +54,13 @@ def get_input():
         default=0.25,
         help="keep cells with parameters above this percentile (default = 0.25)",
     )
+    parser.add_argument(
+        "--fig_format",
+        required=False,
+        type=str,
+        default=".png",
+        help="set the file format of output figures (default = .png)",
+    )
 
     args = parser.parse_args()
 
@@ -66,19 +74,19 @@ def get_input():
 
             print(f"missing file: {f}")
 
-
     return args
 
+
 ### Save to csv files
-def save_csv(df,str):
+def save_csv(df, str):
     """ToDo: write results into csv"""
-    compression = 'zip'
-    filename = (str,'csv',compression)
+    compression = "zip"
+    filename = (str, "csv", compression)
     filename = ".".join(filename)
-    filepath = Path('./results/',filename)
-    compression_opts = dict(method='zip')
-    filepath.parent.mkdir(parents=True, exist_ok=True) 
-    df.to_csv(filepath,sep=",",compression = compression_opts)
+    filepath = Path("./results/", filename)
+    compression_opts = dict(method="zip")
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(filepath, sep=",", compression=compression_opts)
 
 
 class SCAnalysis:
@@ -105,8 +113,9 @@ class SCAnalysis:
             cache=True,
         )
         self.adata.var_names_make_unique()  # necessary because we use gene symbols as var_names
-        print(f"Your data set contains {self.adata.n_obs} cells and {self.adata.n_vars} genes.")
-
+        print(
+            f"Your data set contains {self.adata.n_obs} cells and {self.adata.n_vars} genes."
+        )
 
     def filter_data(self):
         """
@@ -167,7 +176,6 @@ class SCAnalysis:
             f"\tCells should contain genes within the following range: {n_genes_by_count_down_cutoff} - {n_genes_by_count_up_cutoff} (represents {down_cutoff} - {up_cutoff} percentile)."
         )
 
-
         print(
             f"After the further filtering process, your data set contains {adata.n_obs} cells and {adata.n_vars} genes."
         )
@@ -179,69 +187,76 @@ class SCAnalysis:
         # The draw function comes from scanpy itself.
         # # The out plots will be save in "./figures" automatically.
 
-
         adata = self.adata
+        format = args.fig_format
+        print(f"format is {format}")
+
+        preliminaryQC = ("_preliminaryQC", format)
+        preliminaryQC_mt = ("_preliminaryQC", "_mt", format)
+        preliminaryQC_gene = ("_preliminaryQC_gene", format)
+        furtherQC = ("_furtherQC", format)
+        furtherQC_mt = ("_furtherQC_mt", format)
+        furtherQC_gene = ("_furtherQC_gene", format)
+
+        preliminaryQC = "".join(preliminaryQC)
+        preliminaryQC_mt = "".join(preliminaryQC_mt)
+        preliminaryQC_gene = "".join(preliminaryQC_gene)
+        furtherQC = "".join(furtherQC)
+        furtherQC_mt = "".join(furtherQC_mt)
+        furtherQC_gene = "".join(furtherQC_gene)
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
-            self.data,
+            adata,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
             show=False,
-            save="_preliminaryQC.pdf",
+            save=preliminaryQC,
         )
         sc.pl.scatter(
-            self.data,
+            adata,
             x="total_counts",
             y="pct_counts_mt",
             show=False,
-
-            save="_preliminaryQC_mt.pdf",
-
+            save=preliminaryQC_mt,
         )
         sc.pl.scatter(
-            self.data,
+            adata,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
-
-            save="_preliminaryQC_gene.pdf",
-
+            save=preliminaryQC_gene,
         )
 
         ## This should be wrapped up into a plot function
         sc.pl.violin(
-            self.data,
+            adata,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
             show=False,
-            save="_furtherQC.pdf",
+            save=furtherQC,
         )
         sc.pl.scatter(
-            self.data,
-            x="total_counts",
-            y="pct_counts_mt",
-            show=False,
-
-            save="_furtherQC_mt.pdf",
-
+            adata, x="total_counts", y="pct_counts_mt", show=False, save=furtherQC_mt,
         )
         sc.pl.scatter(
-            self.data,
+            adata,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
-
-            save="_furtherQC_gene.pdf",
+            save=furtherQC_gene,
         )
-
 
     def make_analysis(self):
         """generate analysis and plot"""
 
         adata = self.adata
+        format = args.fig_format
+        leidenf = ("leiden", format)
+
+        leidenf = "".join(leidenf)
 
         # Total-count normalize
         sc.pp.normalize_total(adata, target_sum=1e4)
@@ -256,10 +271,10 @@ class SCAnalysis:
         adata.raw = adata
 
         ## Save the high variant gene plot
-        sc.pl.highly_variable_genes(adata,show=False,save="_highlyVariableGenes.pdf")
+        sc.pl.highly_variable_genes(adata, show=False, save="_highlyVariableGenes.pdf")
 
         ## Filter the data based on highly variable genes
-        adata_hvg = self.adata[:,adata.var.highly_variable]
+        adata_hvg = self.adata[:, adata.var.highly_variable]
 
         ## Not sure what the below two steps are doing
         ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
@@ -268,15 +283,16 @@ class SCAnalysis:
         # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
         # sc.pp.scale(adata_hvg, max_value=10)
 
-        df_hvg = pd.DataFrame.sparse.from_spmatrix(adata_hvg.X,index=adata_hvg.obs_names,columns=adata_hvg.var_names)
-        save_csv(df_hvg,"hvg")
+        df_hvg = pd.DataFrame.sparse.from_spmatrix(
+            adata_hvg.X, index=adata_hvg.obs_names, columns=adata_hvg.var_names
+        )
+        save_csv(df_hvg, "hvg")
 
-
-        #umap
+        # umap
         sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
         sc.tl.umap(adata_hvg)
         sc.tl.leiden(adata_hvg)
-        sc.pl.umap(adata_hvg,color=['leiden'],use_raw=False,show=False,save="_leiden_pdf")
+        sc.pl.umap(adata_hvg, color=["leiden"], use_raw=False, show=False, save=leidenf)
 
 
 ## main

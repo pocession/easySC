@@ -130,9 +130,11 @@ class SCAnalysis:
         down_cutoff = args.min_cutoff
         adata = self.adata
 
+        adata_preQC = adata
+
         # Preliminary filtering process
-        sc.pp.filter_cells(adata, min_genes=min_genes)
-        sc.pp.filter_genes(adata, min_cells=min_cells)
+        sc.pp.filter_cells(adata_preQC, min_genes=min_genes)
+        sc.pp.filter_genes(adata_preQC, min_cells=min_cells)
 
         # Generate QC metrics
         adata.var["mt"] = adata.var_names.str.startswith(
@@ -181,6 +183,7 @@ class SCAnalysis:
         )
 
         self.adata = adata
+        self.adata_preQC = adata_preQC
 
     def plot_filtered_data(self):
         # Draw figures for raw data and save them.
@@ -188,6 +191,7 @@ class SCAnalysis:
         # # The out plots will be save in "./figures" automatically.
 
         adata = self.adata
+        adata_preQC = self.adata_preQC
         format = args.fig_format
         print(f"format is {format}")
 
@@ -205,9 +209,9 @@ class SCAnalysis:
         furtherQC_mt = "".join(furtherQC_mt)
         furtherQC_gene = "".join(furtherQC_gene)
 
-        ## This should be wrapped up into a plot function
+        ## Preliminary QC
         sc.pl.violin(
-            adata,
+            adata_preQC,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],
             jitter=0.4,
             multi_panel=True,
@@ -215,21 +219,21 @@ class SCAnalysis:
             save=preliminaryQC,
         )
         sc.pl.scatter(
-            adata,
+            adata_preQC,
             x="total_counts",
             y="pct_counts_mt",
             show=False,
             save=preliminaryQC_mt,
         )
         sc.pl.scatter(
-            adata,
+            adata_preQC,
             x="total_counts",
             y="n_genes_by_counts",
             show=False,
             save=preliminaryQC_gene,
         )
 
-        ## This should be wrapped up into a plot function
+        ## Further QC
         sc.pl.violin(
             adata,
             ["n_genes_by_counts", "total_counts", "pct_counts_mt"],

@@ -6,8 +6,8 @@ This app aims for producing preliminary profiles of single cell data. It only su
 
 ## Usage
 
-- `usage: python3 src/easySC.py [-h] --data DATA [--min_genes MIN_GENES] [--min_cells MIN_CELLS] [--max_cutoff MAX_CUTOFF] [--min_cutoff MIN_CUTOFF]`
-- `--data` `-d`: a folder contains three files: `barcodes.tsv.gz`, `features.tsv.gz`, and `matrix.mtx.gz`.
+- `usage: python3 src/easySC.py [-h] --data_dir DATA [--min_genes MIN_GENES] [--min_cells MIN_CELLS] [--max_cutoff MAX_CUTOFF] [--min_cutoff MIN_CUTOFF]`
+- `--data_dir` `-d`: a folder contains three files: `barcodes.tsv.gz`, `features.tsv.gz`, and `matrix.mtx.gz`.
 - `--min_genes`: specify the minimum genes per cell (default = 200).
 - `--min_cells`: keep genes that are expressed in the minimum number of cells (default = 3).
 - `--max_cutoff`: keep cells with parameters under this percentile (default = 0.75).

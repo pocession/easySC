@@ -14,7 +14,7 @@ The following packages are required to run this code:
 - `pandas`
 - `scanpy`
 
-You can run the following commands to run this script:
+You can run the following commands to install all the dependent packages:
 
 `pip install argparse pathlib numpy pandas scanpy`
 

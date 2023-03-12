@@ -61,4 +61,4 @@ Use pytest for test.
 
 ## Workflow
 
-- ![workflow](easySC_workflow.png)
+![workflow](easySC_workflow.png)

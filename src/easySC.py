@@ -193,7 +193,6 @@ class SCAnalysis:
         adata = self.adata
         adata_preQC = self.adata_preQC
         format = args.fig_format
-        print(f"format is {format}")
 
         preliminaryQC = ("_preliminaryQC", format)
         preliminaryQC_mt = ("_preliminaryQC", "_mt", format)
@@ -254,13 +253,10 @@ class SCAnalysis:
         )
 
     def make_analysis(self):
-        """generate analysis and plot"""
+        """generate analysis result"""
+
 
         adata = self.adata
-        format = args.fig_format
-        leidenf = ("leiden", format)
-
-        leidenf = "".join(leidenf)
 
         # Total-count normalize
         sc.pp.normalize_total(adata, target_sum=1e4)
@@ -273,9 +269,6 @@ class SCAnalysis:
 
         # freeze the data into raw attribute
         adata.raw = adata
-
-        ## Save the high variant gene plot
-        sc.pl.highly_variable_genes(adata, show=False, save="_highlyVariableGenes.pdf")
 
         ## Filter the data based on highly variable genes
         adata_hvg = self.adata[:, adata.var.highly_variable]
@@ -292,12 +285,43 @@ class SCAnalysis:
         )
         save_csv(df_hvg, "hvg")
 
-        # umap
+        # generate analysis for umap
         sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
         sc.tl.umap(adata_hvg)
         sc.tl.leiden(adata_hvg)
+
+        # generate marker genes for each cluster
+        sc.tl.rank_genes_groups(adata_hvg, 'leiden', method='t-test')
+
+        df_markerg = pd.DataFrame(adata_hvg.uns['rank_genes_groups']['names'])
+        save_csv(df_markerg, "markerg")
+
+        self.adata = adata
+        self.adata_hvg = adata_hvg
+
+
+    def plot_analyzed_data(self):
+
+        adata = self.adata
+        adata_hvg = self.adata_hvg
+
+        format = args.fig_format
+        hvgf = ("hvg",format)
+        leidenf = ("leiden", format)
+        markerf = ("marker_genes",format)
+
+        leidenf = "".join(leidenf)
+        hvgf = "".join(hvgf)
+        markerf = "".join(markerf)
+
+        ## Save the high variant gene plot
+        sc.pl.highly_variable_genes(adata, show=False, save=hvgf)
+
+        ## Save the umap
         sc.pl.umap(adata_hvg, color=["leiden"], use_raw=False, show=False, save=leidenf)
 
+        ## Save the marker gene plot
+        sc.pl.rank_genes_groups(adata_hvg, n_genes=25, sharey=False, show=False, save=markerf)
 
 ## main
 if __name__ == "__main__":
@@ -308,3 +332,4 @@ if __name__ == "__main__":
     exp.filter_data()
     exp.plot_filtered_data()
     exp.make_analysis()
+    exp.plot_analyzed_data()

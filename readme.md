@@ -40,11 +40,11 @@ You can download the code either by cloning the repository from GitHub or by dow
 
 - `python src/easySC.py --data_dir /path/to/data --min_genes 250 --min_cells 6`
 
-This will perform a basic analysis of your single-cell RNA-seq data, keeping genes that are expressed in at least 6 cells and cells that have at least 250 expressed genes. Also keep cells with total count and gene count between the 25th and 75th percentile. The results will be saved to a a figures directory in png format as well as in results directory in csv format.
+This will perform a basic analysis of your single-cell RNA-seq data, keeping genes that are expressed in at least 6 cells and cells that have at least 250 expressed genes. Also keep cells with total count and gene count between the 25th and 75th percentile. The output will be saved into the `figures` and `results` folder in `png` and `csv` format, respectively.
 
 ## Updates
 
-- 2023-3-12: The first version is ready for the world.
+- 2023-3-13: The first version is ready for the world.
 
 ## Discussion
 

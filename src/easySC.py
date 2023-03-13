@@ -185,6 +185,52 @@ class SCAnalysis:
         self.adata = adata
         self.adata_preQC = adata_preQC
 
+    def make_analysis(self):
+        """generate analysis result"""
+
+        adata = self.adata
+
+        # Total-count normalize
+        sc.pp.normalize_total(adata, target_sum=1e4)
+
+        # Logarithmize the data:
+        sc.pp.log1p(adata)
+
+        # Identify highly-variable genes.
+        sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
+
+        # freeze the data into raw attribute
+        adata.raw = adata
+
+        ## Filter the data based on highly variable genes
+        adata_hvg = self.adata[:, adata.var.highly_variable]
+
+        ## Not sure what the below two steps are doing
+        ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
+        ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
+
+        # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
+        # sc.pp.scale(adata_hvg, max_value=10)
+
+        df_hvg = pd.DataFrame.sparse.from_spmatrix(
+            adata_hvg.X, index=adata_hvg.obs_names, columns=adata_hvg.var_names
+        )
+        save_csv(df_hvg, "hvg")
+
+        # generate analysis for umap
+        sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
+        sc.tl.umap(adata_hvg)
+        sc.tl.leiden(adata_hvg)
+
+        # generate marker genes for each cluster
+        sc.tl.rank_genes_groups(adata_hvg, "leiden", method="t-test")
+
+        df_markerg = pd.DataFrame(adata_hvg.uns["rank_genes_groups"]["names"])
+        save_csv(df_markerg, "markerg")
+
+        self.adata_log = adata
+        self.adata_hvg = adata_hvg
+
     def plot_filtered_data(self):
         # Draw figures for raw data and save them.
         # The draw function comes from scanpy itself.
@@ -270,52 +316,6 @@ class SCAnalysis:
         sc.pl.rank_genes_groups(
             adata_hvg, n_genes=25, sharey=False, show=False, save=markerf
         )
-
-    def make_analysis(self):
-        """generate analysis result"""
-
-        adata = self.adata
-
-        # Total-count normalize
-        sc.pp.normalize_total(adata, target_sum=1e4)
-
-        # Logarithmize the data:
-        sc.pp.log1p(adata)
-
-        # Identify highly-variable genes.
-        sc.pp.highly_variable_genes(adata, min_mean=0.0125, max_mean=3, min_disp=0.5)
-
-        # freeze the data into raw attribute
-        adata.raw = adata
-
-        ## Filter the data based on highly variable genes
-        adata_hvg = self.adata[:, adata.var.highly_variable]
-
-        ## Not sure what the below two steps are doing
-        ### Regress out effects of total counts per cell and the percentage of mitochondrial genes expressed.
-        ### Scale each gene to unit variance. Clip values exceeding standard deviation 10.
-
-        # sc.pp.regress_out(adata_hvg, ['total_counts', 'pct_counts_mt'])
-        # sc.pp.scale(adata_hvg, max_value=10)
-
-        df_hvg = pd.DataFrame.sparse.from_spmatrix(
-            adata_hvg.X, index=adata_hvg.obs_names, columns=adata_hvg.var_names
-        )
-        save_csv(df_hvg, "hvg")
-
-        # generate analysis for umap
-        sc.pp.neighbors(adata_hvg, n_neighbors=10, n_pcs=40)
-        sc.tl.umap(adata_hvg)
-        sc.tl.leiden(adata_hvg)
-
-        # generate marker genes for each cluster
-        sc.tl.rank_genes_groups(adata_hvg, "leiden", method="t-test")
-
-        df_markerg = pd.DataFrame(adata_hvg.uns["rank_genes_groups"]["names"])
-        save_csv(df_markerg, "markerg")
-
-        self.adata_log = adata
-        self.adata_hvg = adata_hvg
 
 
 ## main

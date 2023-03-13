@@ -4,3 +4,5 @@ figures/
 cache/
 results/
 venv/
+.ipynb_checkpoints/
+*.ipynb

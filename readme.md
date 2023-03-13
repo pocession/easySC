@@ -46,10 +46,6 @@ This will perform a basic analysis of your single-cell RNA-seq data, keeping gen
 
 - 2023-3-13: The first version is ready for the world.
 
-## Discussion
-
-- Please use `issue` in github to create issue and discussion.
-
 ## Test data
 
 - `wget https://cf.10xgenomics.com/samples/cell-exp/4.0.0/SC3_v3_NextGem_SI_PBMC_10K/SC3_v3_NextGem_SI_PBMC_10K_raw_feature_bc_matrix.tar.gz`
